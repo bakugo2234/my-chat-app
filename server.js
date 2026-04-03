@@ -12,40 +12,47 @@ const io = new Server(server, {
 app.use(express.static(__dirname));
 
 // Lưu lịch sử tin nhắn (mảng đơn giản)
+const MAX_MESSAGES = 1000;        // Tăng giới hạn lưu tạm
 let messages = [];
 
-app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/index.html');
-});
+// Hàm thêm tin nhắn
+function addMessageToHistory(data) {
+    messages.push({
+        ...data,
+        timestamp: Date.now(),
+        id: Date.now() + Math.random()   // id tạm
+    });
+
+    if (messages.length > MAX_MESSAGES) {
+        messages.shift();
+    }
+}
+
+// Lấy tin nhắn theo phân trang (mới nhất trước)
+function getMessagesPage(page = 1, limit = 50) {
+    const start = (page - 1) * limit;
+    // Trả về tin mới nhất trước (reverse)
+    return messages.slice().reverse().slice(start, start + limit);
+}
 
 io.on('connection', (socket) => {
     console.log('⚡ Người dùng kết nối:', socket.id);
 
-    // Gửi toàn bộ lịch sử tin nhắn cho người mới kết nối
-    socket.emit('chat history', messages);
+    // Gửi 50 tin nhắn mới nhất khi kết nối
+    socket.emit('chat history', getMessagesPage(1, 50));
 
-    // Nhận tin nhắn mới từ client
     socket.on('chat message', (data) => {
-        console.log(`Tin nhắn từ ${data.user}: ${data.msg}`);
+        addMessageToHistory(data);
+        io.emit('chat message', data);   // real-time
+    });
 
-        // Lưu vào lịch sử
-        messages.push(data);
-
-        // Giới hạn số tin nhắn (tránh chiếm quá nhiều RAM) - giữ tối đa 200 tin
-        if (messages.length > 200) {
-            messages.shift(); // xóa tin cũ nhất
-        }
-
-        // Phát tin nhắn mới cho TẤT CẢ mọi người (bao gồm người gửi)
-        io.emit('chat message', data);
+    // Client yêu cầu load thêm tin cũ
+    socket.on('load more', (page) => {
+        const olderMessages = getMessagesPage(page, 50);
+        socket.emit('load more response', { page, messages: olderMessages });
     });
 
     socket.on('disconnect', () => {
         console.log('❌ Người dùng thoát:', socket.id);
     });
-});
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`🚀 Server chạy tại port ${PORT}`);
 });
