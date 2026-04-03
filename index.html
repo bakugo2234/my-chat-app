@@ -59,7 +59,14 @@
         </div>
 
         <!-- Khu vực tin nhắn -->
-        <ul id="messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-gray-950"></ul>
+        <!-- Khu vực tin nhắn -->
+<ul id="messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-gray-950 scroll-smooth"></ul>
+
+<!-- Loading spinner (ở đầu danh sách) -->
+<div id="loading" class="hidden mx-auto mt-4 flex items-center justify-center gap-2 text-gray-500">
+    <div class="w-5 h-5 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+    <span class="text-sm">Đang tải tin nhắn cũ...</span>
+</div>
 
         <!-- Input giống Messenger -->
         <div class="bg-white dark:bg-gray-900 border-t dark:border-gray-700 p-4">
