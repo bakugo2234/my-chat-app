@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Socket.IO Chat</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        #messages { list-style-type: none; margin: 0; padding: 0; margin-bottom: 20px; }
+        #messages li { padding: 8px; margin-bottom: 5px; background: #f4f4f4; border-radius: 5px; }
+        #form { display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Ứng dụng Chat Real-time 💬</h2>
+    <ul id="messages"></ul>
+    
+    <form id="form">
+        <input id="user" placeholder="Tên bạn" required />
+        <input id="input" placeholder="Nhập tin nhắn..." autocomplete="off" required />
+        <button>Gửi</button>
+    </form>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io(); // Khởi tạo kết nối
+
+        const form = document.getElementById('form');
+        const input = document.getElementById('input');
+        const user = document.getElementById('user');
+        const messages = document.getElementById('messages');
+
+        // Khi nhấn Gửi
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (input.value) {
+                // Gửi sự kiện 'chat message' lên server
+                socket.emit('chat message', {
+                    user: user.value,
+                    msg: input.value
+                });
+                input.value = '';
+            }
+        });
+
+        // Lắng nghe sự kiện 'chat message' từ server trả về
+        socket.on('chat message', (data) => {
+            const item = document.createElement('li');
+            item.textContent = `${data.user}: ${data.msg}`;
+            messages.appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+    </script>
+</body>
+</html>
