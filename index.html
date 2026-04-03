@@ -94,61 +94,124 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io();
+       const socket = io();
 
-        const form = document.getElementById('form');
-        const input = document.getElementById('input');
-        const userInput = document.getElementById('user');
-        const messagesList = document.getElementById('messages');
+const form = document.getElementById('form');
+const input = document.getElementById('input');
+const userInput = document.getElementById('user');
+const messagesList = document.getElementById('messages');
+const loadingSpinner = document.getElementById('loading');
 
-        // Thêm tin nhắn vào giao diện
-        function addMessage(data, isHistory = false) {
-            const item = document.createElement('li');
-            const isOwn = data.user === userInput.value.trim();
+let currentPage = 1;
+let isLoading = false;
+let hasMore = true;
+let userName = '';
 
-            item.className = `flex ${isOwn ? 'justify-end' : 'justify-start'}`;
+// Hàm thêm tin nhắn (dùng cho cả mới và cũ)
+function addMessage(data, prepend = false) {
+    const item = document.createElement('li');
+    const isOwn = data.user === userName;
+    const time = data.timestamp 
+        ? new Date(data.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        : new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
-            item.innerHTML = `
-                <div class="max-w-[75%]">
-                    ${!isOwn ? `<p class="text-xs text-gray-500 dark:text-gray-400 mb-1 ml-2">${data.user}</p>` : ''}
-                    <div class="message-bubble ${isOwn ? 'own-message' : 'other-message'}">
-                        ${data.msg}
-                    </div>
-                    <p class="text-[10px] text-gray-400 mt-1 ${isOwn ? 'text-right mr-2' : 'ml-2'}">
-                        ${new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                </div>
-            `;
+    item.className = `flex ${isOwn ? 'justify-end' : 'justify-start'}`;
 
-            messagesList.appendChild(item);
-            messagesList.scrollTop = messagesList.scrollHeight;
+    item.innerHTML = `
+        <div class="max-w-[75%]">
+            ${!isOwn ? `<p class="text-xs text-gray-500 dark:text-gray-400 mb-1 ml-2">${data.user}</p>` : ''}
+            <div class="message-bubble ${isOwn ? 'own-message' : 'other-message'}">
+                ${data.msg}
+            </div>
+            <p class="text-[10px] text-gray-400 mt-1 ${isOwn ? 'text-right mr-2' : 'ml-2'}">
+                ${time}
+            </p>
+        </div>
+    `;
+
+    if (prepend) {
+        messagesList.prepend(item);   // Thêm vào đầu
+    } else {
+        messagesList.appendChild(item); // Thêm vào cuối
+    }
+}
+
+// Khi nhận lịch sử ban đầu (30 tin mới nhất)
+socket.on('chat history', (history) => {
+    messagesList.innerHTML = '';
+    history.forEach(msg => addMessage(msg));
+    currentPage = 1;
+    hasMore = true;
+});
+
+// Nhận tin nhắn mới real-time
+socket.on('chat message', (data) => {
+    addMessage(data);
+    messagesList.scrollTop = messagesList.scrollHeight;
+});
+
+// Infinite scroll: Kéo lên trên → tải tin cũ
+messagesList.addEventListener('scroll', () => {
+    if (isLoading || !hasMore) return;
+
+    // Nếu scroll gần đầu danh sách (cách đầu < 300px)
+    if (messagesList.scrollTop < 300) {
+        loadOlderMessages();
+    }
+});
+
+async function loadOlderMessages() {
+    if (isLoading || !hasMore) return;
+    
+    isLoading = true;
+    loadingSpinner.classList.remove('hidden');
+
+    currentPage++;
+
+    socket.emit('load older messages', currentPage);
+
+    // Nhận phản hồi từ server
+    socket.once('older messages response', ({ page, messages: olderMsgs, hasMore: more }) => {
+        if (olderMsgs.length === 0) {
+            hasMore = false;
+            loadingSpinner.classList.add('hidden');
+            isLoading = false;
+            return;
         }
 
-        // Nhận lịch sử tin nhắn khi load hoặc reconnect
-        socket.on('chat history', (history) => {
-            messagesList.innerHTML = '';
-            history.forEach(msg => addMessage(msg, true));
+        const oldHeight = messagesList.scrollHeight;
+
+        // Thêm tin cũ vào ĐẦU danh sách (tin cũ nhất lên trên)
+        olderMsgs.reverse().forEach(msg => {
+            addMessage(msg, true);   // prepend = true
         });
 
-        // Nhận tin nhắn mới thời gian thực
-        socket.on('chat message', (data) => {
-            addMessage(data);
-        });
+        // Giữ vị trí scroll không bị nhảy
+        messagesList.scrollTop = messagesList.scrollHeight - oldHeight;
 
-        // Gửi tin nhắn
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            if (input.value.trim() && userInput.value.trim()) {
-                socket.emit('chat message', {
-                    user: userInput.value.trim(),
-                    msg: input.value.trim()
-                });
-                input.value = '';
-            }
-        });
+        hasMore = more;
+        isLoading = false;
+        loadingSpinner.classList.add('hidden');
+    });
+}
 
-        // Tự động focus vào ô tin nhắn
-        window.onload = () => input.focus();
+// Gửi tin nhắn
+form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (input.value.trim() && userInput.value.trim()) {
+        userName = userInput.value.trim();   // lưu tên người dùng
+        socket.emit('chat message', {
+            user: userName,
+            msg: input.value.trim()
+        });
+        input.value = '';
+    }
+});
+
+// Focus ô input khi load xong
+window.onload = () => {
+    input.focus();
+};
     </script>
 </body>
 </html>
