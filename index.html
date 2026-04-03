@@ -20,34 +20,47 @@
     </form>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io(); // Khởi tạo kết nối
+   <script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
 
-        const form = document.getElementById('form');
-        const input = document.getElementById('input');
-        const user = document.getElementById('user');
-        const messages = document.getElementById('messages');
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const userInput = document.getElementById('user');
+    const messagesList = document.getElementById('messages');
 
-        // Khi nhấn Gửi
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            if (input.value) {
-                // Gửi sự kiện 'chat message' lên server
-                socket.emit('chat message', {
-                    user: user.value,
-                    msg: input.value
-                });
-                input.value = '';
-            }
+    // Hàm thêm tin nhắn vào giao diện
+    function addMessage(data) {
+        const item = document.createElement('li');
+        item.textContent = `${data.user}: ${data.msg}`;
+        messagesList.appendChild(item);
+        window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    // Khi kết nối thành công → nhận lịch sử tin nhắn cũ
+    socket.on('chat history', (history) => {
+        messagesList.innerHTML = ''; // xóa tin cũ trên màn hình trước khi load lịch sử
+        history.forEach(msg => {
+            addMessage(msg);
         });
+    });
 
-        // Lắng nghe sự kiện 'chat message' từ server trả về
-        socket.on('chat message', (data) => {
-            const item = document.createElement('li');
-            item.textContent = `${data.user}: ${data.msg}`;
-            messages.appendChild(item);
-            window.scrollTo(0, document.body.scrollHeight);
-        });
-    </script>
+    // Nhận tin nhắn mới thời gian thực
+    socket.on('chat message', (data) => {
+        addMessage(data);
+    });
+
+    // Gửi tin nhắn
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (input.value && userInput.value) {
+            socket.emit('chat message', {
+                user: userInput.value,
+                msg: input.value
+            });
+            input.value = '';
+        }
+    });
+</script>
 </body>
 </html>
